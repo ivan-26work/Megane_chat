@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0084ff">
+    <link rel="manifest" href="manifest.json">
     <title>Mégane Chat - Messages</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/nav-bar.css">
@@ -10,7 +12,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header fixe avec barre de recherche -->
         <header class="chat-header">
             <div class="search-bar">
                 <div class="search-input-wrapper">
@@ -18,7 +19,6 @@
                     <input type="text" class="search-input" id="search-input" placeholder="Rechercher une conversation...">
                 </div>
             </div>
-            <!-- Menu contextuel (trois points) qui apparaît sur appui long -->
             <div id="context-menu" class="context-menu" style="display: none;">
                 <button id="view-profile" class="context-item"><i class="fas fa-user"></i> Voir le profil</button>
                 <button id="add-favorite" class="context-item"><i class="fas fa-star"></i> Ajouter aux favoris</button>
@@ -29,15 +29,15 @@
             </div>
         </header>
 
-        <!-- Catégories dynamiques (Favoris / Archivés) -->
         <div id="categories-container" class="categories-container"></div>
 
-        <!-- Liste des conversations -->
         <div class="conversations-list" id="conversations-list">
-            <!-- Les contacts seront chargés dynamiquement -->
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Chargement des discussions...</p>
+            </div>
         </div>
 
-        <!-- Barre de navigation officielle avec liens href -->
         <div class="bottom-nav">
             <a href="index.html" class="nav-btn active" data-page="chat">
                 <i class="fas fa-comment nav-icon"></i>
@@ -60,5 +60,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/index.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker enregistré', reg))
+                .catch(err => console.error('Erreur SW:', err));
+        }
+    </script>
 </body>
 </html>
