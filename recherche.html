@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0084ff">
+    <link rel="manifest" href="manifest.json">
     <title>Mégane Chat - Recherche</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/nav-bar.css">
@@ -10,7 +12,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header fixe avec barre de recherche -->
         <header class="search-header">
             <div class="search-bar">
                 <div class="search-input-wrapper">
@@ -20,7 +21,6 @@
             </div>
         </header>
 
-        <!-- Onglets -->
         <div class="tabs-container">
             <button class="tab-btn active" data-tab="contacts">
                 <i class="fas fa-users"></i>
@@ -36,12 +36,13 @@
             </button>
         </div>
 
-        <!-- Contenu dynamique -->
         <div class="content-container" id="content-container">
-            <!-- Les résultats seront chargés dynamiquement -->
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Chargement...</p>
+            </div>
         </div>
 
-        <!-- Barre de navigation officielle avec liens href -->
         <div class="bottom-nav">
             <a href="index.html" class="nav-btn" data-page="chat">
                 <i class="fas fa-comment nav-icon"></i>
@@ -64,5 +65,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/recherche.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker enregistré', reg))
+                .catch(err => console.error('Erreur SW:', err));
+        }
+    </script>
 </body>
 </html>
