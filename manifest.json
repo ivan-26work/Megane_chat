@@ -1,0 +1,28 @@
+{
+  "name": "Mégane Chat",
+  "short_name": "MeganeChat",
+  "description": "Application de messagerie légère et rapide",
+  "start_url": "/Megane_chat/index.html",
+  "display": "standalone",
+  "theme_color": "#0084ff",
+  "background_color": "#f0f2f5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "launchericon-192-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "launchericon-512-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "messaging", "productivity"],
+  "screenshots": [],
+  "prefer_related_applications": false,
+  "related_applications": []
+}
