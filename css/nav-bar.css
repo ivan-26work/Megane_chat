@@ -1,0 +1,124 @@
+/* nav-bar.css - Style officiel de la barre de navigation */
+
+/* ========== BARRE DE NAVIGATION OFFICIELLE ========== */
+.bottom-nav {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 30px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    transition: transform 0.3s ease, opacity 0.3s ease, background 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+}
+
+/* Mode nuit */
+body.dark-mode .bottom-nav {
+    background: rgba(31, 31, 31, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Boutons de navigation (liens) */
+.nav-btn {
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 30px;
+    transition: all 0.2s ease;
+    color: #65676b;
+    text-decoration: none;
+    font-size: 12px;
+    min-width: 64px;
+}
+
+/* Icônes */
+.nav-icon {
+    font-size: 22px;
+    transition: transform 0.2s ease;
+}
+
+/* Label */
+.nav-label {
+    font-size: 11px;
+    font-weight: 500;
+    transition: opacity 0.2s ease;
+}
+
+/* État actif */
+.nav-btn.active {
+    color: #0084ff;
+    background: rgba(0, 132, 255, 0.1);
+}
+
+.nav-btn.active .nav-icon {
+    transform: scale(1.05);
+}
+
+/* Effet au clic / tap */
+.nav-btn:active {
+    transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .nav-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Animation de disparition au scroll */
+.bottom-nav.hide {
+    transform: translateY(80px);
+    opacity: 0;
+}
+
+/* Responsive : ajustement pour petits écrans */
+@media (max-width: 480px) {
+    .bottom-nav {
+        bottom: 12px;
+        left: 12px;
+        right: 12px;
+        height: 56px;
+    }
+    
+    .nav-btn {
+        padding: 6px 12px;
+        min-width: 56px;
+    }
+    
+    .nav-icon {
+        font-size: 20px;
+    }
+    
+    .nav-label {
+        font-size: 10px;
+    }
+}
+
+/* Pour les très petits écrans (moins de 380px) */
+@media (max-width: 380px) {
+    .nav-btn {
+        padding: 6px 8px;
+        min-width: 48px;
+    }
+    
+    .nav-icon {
+        font-size: 18px;
+    }
+    
+    .nav-label {
+        font-size: 9px;
+    }
+}
