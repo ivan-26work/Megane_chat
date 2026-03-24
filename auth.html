@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0084ff">
+    <link rel="manifest" href="manifest.json">
     <title>Mégane Chat - Authentification</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/auth.css">
 </head>
 <body>
 
-    <!-- Notification flottante -->
     <div id="notification" class="notification" style="display: none;">
         <span id="notification-message"></span>
         <button id="close-notif" class="notif-close">×</button>
     </div>
 
-    <!-- Header fixe -->
     <header class="header">
         <div class="logo">
             <img src="logo.png" alt="Logo" class="logo-img">
@@ -34,9 +34,7 @@
         </div>
     </header>
 
-    <!-- Corps principal -->
     <main class="main-content">
-        <!-- Section session existante (cachée par défaut) -->
         <div id="session-section" class="session-section" style="display: none;">
             <div class="profile-info">
                 <div id="profile-photo" class="profile-photo">
@@ -50,13 +48,11 @@
             </div>
         </div>
 
-        <!-- Onglets -->
         <div id="tabs-container" class="tabs">
             <button id="tab-login" class="tab-btn active" data-tab="login">Connexion</button>
             <button id="tab-register" class="tab-btn" data-tab="register">Inscription</button>
         </div>
 
-        <!-- Formulaire Connexion -->
         <div id="login-form" class="form-container active">
             <div class="input-group">
                 <i class="fas fa-envelope input-icon"></i>
@@ -75,7 +71,6 @@
             <button id="login-btn" class="action-btn">SE CONNECTER</button>
         </div>
 
-        <!-- Formulaire Inscription -->
         <div id="register-form" class="form-container">
             <div class="input-group">
                 <i class="fas fa-user input-icon"></i>
@@ -100,7 +95,6 @@
             <button id="register-btn" class="action-btn">S'INSCRIRE</button>
         </div>
 
-        <!-- Formulaire Réinitialisation (caché par défaut) -->
         <div id="reset-form" class="form-container">
             <div class="input-group">
                 <i class="fas fa-envelope input-icon"></i>
@@ -113,5 +107,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker enregistré', reg))
+                .catch(err => console.error('Erreur SW:', err));
+        }
+    </script>
 </body>
 </html>
