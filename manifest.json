@@ -9,13 +9,13 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "launchericon-192-192.png",
+      "src": "https://ivan-26work.github.io/Megane_chat/launchericon-192-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "launchericon-512-512.png",
+      "src": "https://ivan-26work.github.io/Megane_chat/launchericon-512-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
