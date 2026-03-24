@@ -7,21 +7,22 @@
   "theme_color": "#0084ff",
   "background_color": "#f0f2f5",
   "orientation": "portrait",
+  "scope": "/Megane_chat/",
   "icons": [
     {
-      "src": "https://ivan-26work.github.io/Megane_chat/launchericon-192-192.png",
+      "src": "launchericon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://ivan-26work.github.io/Megane_chat/launchericon-512-512.png",
+      "src": "launchericon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["social", "messaging", "productivity"],
+  "categories": ["social", "messaging"],
   "screenshots": [],
   "prefer_related_applications": false,
   "related_applications": []
