@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mégane Chat - Messages</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/nav-bar.css">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header fixe avec barre de recherche -->
+        <header class="chat-header">
+            <div class="search-bar">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" id="search-input" placeholder="Rechercher une conversation...">
+                </div>
+            </div>
+            <!-- Menu contextuel (trois points) qui apparaît sur appui long -->
+            <div id="context-menu" class="context-menu" style="display: none;">
+                <button id="view-profile" class="context-item"><i class="fas fa-user"></i> Voir le profil</button>
+                <button id="add-favorite" class="context-item"><i class="fas fa-star"></i> Ajouter aux favoris</button>
+                <button id="pin-chat" class="context-item"><i class="fas fa-thumbtack"></i> Épingler</button>
+                <button id="archive-chat" class="context-item"><i class="fas fa-archive"></i> Archiver</button>
+                <button id="delete-chat" class="context-item"><i class="fas fa-trash"></i> Supprimer</button>
+                <button id="report-chat" class="context-item"><i class="fas fa-flag"></i> Signaler</button>
+            </div>
+        </header>
+
+        <!-- Catégories dynamiques (Favoris / Archivés) -->
+        <div id="categories-container" class="categories-container"></div>
+
+        <!-- Liste des conversations -->
+        <div class="conversations-list" id="conversations-list">
+            <!-- Les contacts seront chargés dynamiquement -->
+        </div>
+
+        <!-- Barre de navigation officielle avec liens href -->
+        <div class="bottom-nav">
+            <a href="index.html" class="nav-btn active" data-page="chat">
+                <i class="fas fa-comment nav-icon"></i>
+                <span class="nav-label">chat</span>
+            </a>
+            <a href="blog.html" class="nav-btn" data-page="blog">
+                <i class="fas fa-pen-alt nav-icon"></i>
+                <span class="nav-label">blog</span>
+            </a>
+            <a href="recherche.html" class="nav-btn" data-page="recherche">
+                <i class="fas fa-search nav-icon"></i>
+                <span class="nav-label">recherche</span>
+            </a>
+            <a href="para.html" class="nav-btn" data-page="parametres">
+                <i class="fas fa-cog nav-icon"></i>
+                <span class="nav-label">paramètres</span>
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/index.js"></script>
+</body>
+</html>

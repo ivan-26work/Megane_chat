@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mégane Chat - Recherche</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/nav-bar.css">
+    <link rel="stylesheet" href="css/recherche.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header fixe avec barre de recherche -->
+        <header class="search-header">
+            <div class="search-bar">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" id="search-input" placeholder="Rechercher un utilisateur...">
+                </div>
+            </div>
+        </header>
+
+        <!-- Onglets -->
+        <div class="tabs-container">
+            <button class="tab-btn active" data-tab="contacts">
+                <i class="fas fa-users"></i>
+                <span>Contacts</span>
+            </button>
+            <button class="tab-btn" data-tab="received">
+                <i class="fas fa-inbox"></i>
+                <span>Reçues</span>
+            </button>
+            <button class="tab-btn" data-tab="sent">
+                <i class="fas fa-paper-plane"></i>
+                <span>Envoyées</span>
+            </button>
+        </div>
+
+        <!-- Contenu dynamique -->
+        <div class="content-container" id="content-container">
+            <!-- Les résultats seront chargés dynamiquement -->
+        </div>
+
+        <!-- Barre de navigation officielle avec liens href -->
+        <div class="bottom-nav">
+            <a href="index.html" class="nav-btn" data-page="chat">
+                <i class="fas fa-comment nav-icon"></i>
+                <span class="nav-label">chat</span>
+            </a>
+            <a href="blog.html" class="nav-btn" data-page="blog">
+                <i class="fas fa-pen-alt nav-icon"></i>
+                <span class="nav-label">blog</span>
+            </a>
+            <a href="recherche.html" class="nav-btn active" data-page="recherche">
+                <i class="fas fa-search nav-icon"></i>
+                <span class="nav-label">recherche</span>
+            </a>
+            <a href="para.html" class="nav-btn" data-page="parametres">
+                <i class="fas fa-cog nav-icon"></i>
+                <span class="nav-label">paramètres</span>
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/recherche.js"></script>
+</body>
+</html>

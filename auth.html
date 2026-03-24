@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mégane Chat - Authentification</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+
+    <!-- Notification flottante -->
+    <div id="notification" class="notification" style="display: none;">
+        <span id="notification-message"></span>
+        <button id="close-notif" class="notif-close">×</button>
+    </div>
+
+    <!-- Header fixe -->
+    <header class="header">
+        <div class="logo">
+            <img src="logo.png" alt="Logo" class="logo-img">
+        </div>
+        <div class="app-title">
+            <span id="app-name">Mégane Chat</span>
+            <div id="loader" class="loader" style="display: none;"></div>
+        </div>
+        <div class="menu-container">
+            <button id="menu-btn" class="menu-btn"><i class="fas fa-ellipsis-v"></i></button>
+            <div id="dropdown-menu" class="dropdown-menu">
+                <a href="aide.html">Aide</a>
+                <a href="contact.html">Contact</a>
+                <a href="propos.html">À propos</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Corps principal -->
+    <main class="main-content">
+        <!-- Section session existante (cachée par défaut) -->
+        <div id="session-section" class="session-section" style="display: none;">
+            <div class="profile-info">
+                <div id="profile-photo" class="profile-photo">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <span id="session-username" class="session-username"></span>
+            </div>
+            <div class="session-actions">
+                <button id="use-session-btn" class="session-action-btn">Connexion</button>
+                <button id="new-account-btn" class="session-action-btn">Inscription</button>
+            </div>
+        </div>
+
+        <!-- Onglets -->
+        <div id="tabs-container" class="tabs">
+            <button id="tab-login" class="tab-btn active" data-tab="login">Connexion</button>
+            <button id="tab-register" class="tab-btn" data-tab="register">Inscription</button>
+        </div>
+
+        <!-- Formulaire Connexion -->
+        <div id="login-form" class="form-container active">
+            <div class="input-group">
+                <i class="fas fa-envelope input-icon"></i>
+                <input type="text" id="login-identifier" placeholder="Email ou nom d'utilisateur" autocomplete="username">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-lock input-icon"></i>
+                <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password">
+            </div>
+            <div class="options-row">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="remember-me"> Se souvenir de moi
+                </label>
+                <button id="forgot-password-link" class="forgot-link">Mot de passe oublié ?</button>
+            </div>
+            <button id="login-btn" class="action-btn">SE CONNECTER</button>
+        </div>
+
+        <!-- Formulaire Inscription -->
+        <div id="register-form" class="form-container">
+            <div class="input-group">
+                <i class="fas fa-user input-icon"></i>
+                <input type="text" id="register-username" placeholder="Nom d'utilisateur" autocomplete="username">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-envelope input-icon"></i>
+                <input type="email" id="register-email" placeholder="Email" autocomplete="email">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-lock input-icon"></i>
+                <input type="password" id="register-password" placeholder="Mot de passe" autocomplete="new-password">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-check-circle input-icon"></i>
+                <input type="password" id="register-confirm" placeholder="Confirmer le mot de passe" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-phone input-icon"></i>
+                <input type="tel" id="register-phone" placeholder="Téléphone (optionnel)" autocomplete="tel">
+            </div>
+            <button id="register-btn" class="action-btn">S'INSCRIRE</button>
+        </div>
+
+        <!-- Formulaire Réinitialisation (caché par défaut) -->
+        <div id="reset-form" class="form-container">
+            <div class="input-group">
+                <i class="fas fa-envelope input-icon"></i>
+                <input type="email" id="reset-email" placeholder="Votre adresse email" autocomplete="email">
+            </div>
+            <button id="reset-btn" class="action-btn">ENVOYER</button>
+            <button id="back-to-login-link" class="back-link">Retour à la connexion</button>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>
