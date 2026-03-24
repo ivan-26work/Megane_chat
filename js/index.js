@@ -1,358 +1,537 @@
-// index.js
-const supabaseUrl = 'https://mqfeisvvyrzeauayyilv.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xZmVpc3Z2eXJ6ZWF1YXl5aWx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDE1NDcsImV4cCI6MjA4OTc3NzU0N30.7Tj1OUuEZmd5oqdVNACcG4eXQ13MBCgKmaJ43nJitdQ';
+// index.js - Page des discussions récentes
+const SUPABASE_URL = 'https://mqfeisvvyrzeauayyilv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xZmVpc3Z2eXJ6ZWF1YXl5aWx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDE1NDcsImV4cCI6MjA4OTc3NzU0N30.7Tj1OUuEZmd5oqdVNACcG4eXQ13MBCgKmaJ43nJitdQ';
 
-let supabaseClient;
-let currentUserId = null;
+if (!window._supabaseClient) {
+    window._supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+const supabaseClient = window._supabaseClient;
+
+// État global
 let currentUser = null;
-let selectedContactId = null;
+let conversations = [];
+let favoriteConversations = [];
+let archivedConversations = [];
+let pinnedConversations = [];
+let currentSelectedContact = null;
 let longPressTimer = null;
-let isLongPress = false;
+let contextMenu = document.getElementById('context-menu');
 
-// Éléments DOM
-const conversationsList = document.getElementById('conversations-list');
+// DOM Elements
 const searchInput = document.getElementById('search-input');
-const contextMenu = document.getElementById('context-menu');
-const viewProfileBtn = document.getElementById('view-profile');
-const addFavoriteBtn = document.getElementById('add-favorite');
-const pinChatBtn = document.getElementById('pin-chat');
-const archiveChatBtn = document.getElementById('archive-chat');
-const deleteChatBtn = document.getElementById('delete-chat');
-const reportChatBtn = document.getElementById('report-chat');
+const conversationsList = document.getElementById('conversations-list');
 const categoriesContainer = document.getElementById('categories-container');
-const bottomNav = document.getElementById('bottom-nav');
 
-// Initialisation
-async function init() {
-    await initSupabase();
-    await checkAuth();
-    if (currentUserId) {
-        await loadConversations();
-        setupEventListeners();
-        setupNavigation();
-    }
-}
-
-async function initSupabase() {
-    if (window.supabase) {
-        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-    } else {
-        console.error('Supabase non chargé');
-    }
-}
-
-async function checkAuth() {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        window.location.href = 'auth.html';
-        return;
-    }
-    
-    const { data: { user }, error } = await supabaseClient.auth.getUser(token);
+// ========== UTILISATEUR ==========
+async function getCurrentUser() {
+    const { data: { user }, error } = await supabaseClient.auth.getUser();
     if (error || !user) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('persist_session');
         window.location.href = 'auth.html';
-        return;
+        return null;
     }
     
-    currentUserId = user.id;
     const { data: userData } = await supabaseClient
         .from('users')
-        .select('*')
-        .eq('id', currentUserId)
+        .select('id, username, avatar_url')
+        .eq('id', user.id)
         .single();
     
-    currentUser = userData;
+    currentUser = userData || { id: user.id, username: user.email };
+    return currentUser;
+}
+
+// ========== CHARGER LES CONVERSATIONS ==========
+async function loadConversations() {
+    // Récupérer tous les contacts acceptés
+    const { data: contacts, error: contactsError } = await supabaseClient
+        .from('invitations')
+        .select(`
+            id,
+            sender_id,
+            receiver_id,
+            users_sender:users!invitations_sender_id_fkey(id, username, avatar_url),
+            users_receiver:users!invitations_receiver_id_fkey(id, username, avatar_url)
+        `)
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
     
-    // Appliquer mode nuit
-    if (currentUser && currentUser.dark_mode) {
-        document.body.classList.add('dark-mode');
+    if (contactsError) {
+        console.error('Erreur chargement contacts:', contactsError);
+        return [];
+    }
+    
+    const contactList = contacts.map(inv => {
+        const isSender = inv.sender_id === currentUser.id;
+        const contactData = isSender ? inv.users_receiver : inv.users_sender;
+        return {
+            id: contactData.id,
+            username: contactData.username,
+            avatar_url: contactData.avatar_url,
+            invitation_id: inv.id
+        };
+    });
+    
+    // Récupérer les messages récents pour chaque contact
+    const conversationsWithLastMsg = [];
+    
+    for (const contact of contactList) {
+        // Récupérer ou créer une conversation
+        let convId = null;
+        const { data: existingConv } = await supabaseClient
+            .from('conversations')
+            .select('id')
+            .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${contact.id}),and(user1_id.eq.${contact.id},user2_id.eq.${currentUser.id})`)
+            .single();
+        
+        if (existingConv) {
+            convId = existingConv.id;
+        } else {
+            const { data: newConv } = await supabaseClient
+                .from('conversations')
+                .insert({
+                    user1_id: currentUser.id,
+                    user2_id: contact.id,
+                    last_message: '',
+                    last_timestamp: new Date().toISOString()
+                })
+                .select()
+                .single();
+            convId = newConv?.id;
+        }
+        
+        // Récupérer le dernier message
+        let lastMessage = null;
+        let unreadCount = 0;
+        
+        if (convId) {
+            const { data: messages } = await supabaseClient
+                .from('messages')
+                .select('content, timestamp, status, sender_id')
+                .eq('conversation_id', convId)
+                .order('timestamp', { ascending: false })
+                .limit(1);
+            
+            if (messages && messages.length > 0) {
+                lastMessage = messages[0];
+            }
+            
+            // Compter les messages non lus
+            const { count } = await supabaseClient
+                .from('messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('conversation_id', convId)
+                .eq('receiver_id', currentUser.id)
+                .eq('status', 'sent');
+            
+            unreadCount = count || 0;
+        }
+        
+        // Récupérer les préférences utilisateur (épinglé, favori, archivé)
+        const { data: pref } = await supabaseClient
+            .from('user_conversation_prefs')
+            .select('is_pinned, is_favorite, is_archived')
+            .eq('user_id', currentUser.id)
+            .eq('contact_id', contact.id)
+            .single();
+        
+        conversationsWithLastMsg.push({
+            ...contact,
+            conversation_id: convId,
+            last_message: lastMessage?.content || '',
+            last_timestamp: lastMessage?.timestamp || null,
+            unread_count: unreadCount,
+            is_pinned: pref?.is_pinned || false,
+            is_favorite: pref?.is_favorite || false,
+            is_archived: pref?.is_archived || false
+        });
+    }
+    
+    // Trier par date (plus récent en premier)
+    conversationsWithLastMsg.sort((a, b) => {
+        if (!a.last_timestamp) return 1;
+        if (!b.last_timestamp) return -1;
+        return new Date(b.last_timestamp) - new Date(a.last_timestamp);
+    });
+    
+    return conversationsWithLastMsg;
+}
+
+// ========== AFFICHAGE DES CONVERSATIONS ==========
+function formatLastMessage(content) {
+    if (!content) return 'Aucun message';
+    if (content.startsWith('🖼️')) return '📷 Photo';
+    if (content.startsWith('🎬')) return '🎥 Vidéo';
+    if (content.startsWith('🎵')) return '🎵 Audio';
+    if (content.startsWith('📄')) return '📄 Document';
+    if (content.startsWith('🎤')) return '🎤 Message vocal';
+    if (content.length > 50) return content.substring(0, 50) + '...';
+    return content;
+}
+
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (days === 1) {
+        return 'hier';
+    } else if (days < 7) {
+        return ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][date.getDay()];
+    } else {
+        return date.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
     }
 }
 
-async function loadConversations() {
-    // Récupérer les conversations
-    const { data: conversations, error } = await supabaseClient
-        .from('conversations')
-        .select(`
-            id,
-            updated_at,
-            participants:conversation_participants!inner(user_id),
-            last_message:messages!conversation_last_message_fkey(message, created_at, sender_id)
-        `)
-        .eq('participants.user_id', currentUserId)
-        .order('updated_at', { ascending: false });
-    
-    if (error) {
-        console.error('Erreur chargement conversations:', error);
+function renderConversations(convs) {
+    if (!convs || convs.length === 0) {
+        conversationsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-comments"></i>
+                <p>Aucune discussion</p>
+                <p>Recherchez des utilisateurs pour commencer</p>
+            </div>
+        `;
         return;
     }
     
-    // Récupérer les infos des contacts
-    const contactsData = [];
-    for (const conv of conversations) {
-        const otherParticipant = conv.participants.find(p => p.user_id !== currentUserId);
-        if (otherParticipant) {
-            const { data: userData } = await supabaseClient
-                .from('users')
-                .select('id, username, avatar_url, status, last_seen')
-                .eq('id', otherParticipant.user_id)
-                .single();
-            
-            if (userData) {
-                // Compter messages non lus
-                const { count: unreadCount } = await supabaseClient
-                    .from('messages')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('conversation_id', conv.id)
-                    .eq('sender_id', otherParticipant.user_id)
-                    .eq('read', false);
-                
-                contactsData.push({
-                    id: conv.id,
-                    contactId: otherParticipant.user_id,
-                    username: userData.username,
-                    avatar_url: userData.avatar_url,
-                    status: userData.status || 'offline',
-                    last_seen: userData.last_seen,
-                    last_message: conv.last_message ? {
-                        text: conv.last_message.message,
-                        time: conv.last_message.created_at,
-                        sender_id: conv.last_message.sender_id
-                    } : null,
-                    updated_at: conv.updated_at,
-                    unread_count: unreadCount || 0,
-                    is_pinned: false,
-                    is_favorite: false,
-                    is_archived: false
-                });
-            }
-        }
-    }
+    conversationsList.innerHTML = '';
     
-    // Charger les préférences utilisateur (favoris, épinglés, archivés)
-    const { data: preferences } = await supabaseClient
-        .from('user_conversation_preferences')
-        .select('conversation_id, is_favorite, is_pinned, is_archived')
-        .eq('user_id', currentUserId);
-    
-    const prefMap = {};
-    if (preferences) {
-        preferences.forEach(pref => {
-            prefMap[pref.conversation_id] = {
-                is_favorite: pref.is_favorite,
-                is_pinned: pref.is_pinned,
-                is_archived: pref.is_archived
-            };
-        });
-    }
-    
-    // Appliquer les préférences
-    contactsData.forEach(contact => {
-        const pref = prefMap[contact.id];
-        if (pref) {
-            contact.is_favorite = pref.is_favorite || false;
-            contact.is_pinned = pref.is_pinned || false;
-            contact.is_archived = pref.is_archived || false;
-        }
-    });
-    
-    renderConversations(contactsData);
-}
-
-function renderConversations(contacts) {
-    // Séparer les contacts
-    const pinned = contacts.filter(c => c.is_pinned);
-    const favorites = contacts.filter(c => c.is_favorite && !c.is_pinned && !c.is_archived);
-    const normal = contacts.filter(c => !c.is_pinned && !c.is_favorite && !c.is_archived);
-    const archived = contacts.filter(c => c.is_archived);
-    
-    let categoriesHtml = '';
-    let hasCategories = false;
-    
-    // Favoris
-    if (favorites.length > 0) {
-        hasCategories = true;
-        categoriesHtml += `
-            <div class="category-bar" data-category="favorites">
-                <div class="category-header" data-toggle="favorites">
-                    <span class="category-title"><i class="fas fa-star"></i> Favoris</span>
-                    <span class="category-toggle"><i class="fas fa-chevron-down"></i></span>
+    convs.forEach(conv => {
+        const initial = conv.username.charAt(0).toUpperCase();
+        const avatarHtml = conv.avatar_url 
+            ? `<img src="${conv.avatar_url}" class="avatar" alt="${conv.username}">`
+            : `<div class="avatar">${initial}</div>`;
+        
+        const lastMessage = formatLastMessage(conv.last_message);
+        const timeStr = formatTime(conv.last_timestamp);
+        const unreadBadge = conv.unread_count > 0 
+            ? `<span class="unread-badge">${conv.unread_count}</span>` 
+            : '';
+        
+        const pinnedIcon = conv.is_pinned 
+            ? '<i class="fas fa-thumbtack pinned-icon"></i>' 
+            : '';
+        
+        const item = document.createElement('div');
+        item.className = `contact-item ${conv.is_pinned ? 'pinned' : ''}`;
+        item.setAttribute('data-contact-id', conv.id);
+        item.setAttribute('data-conversation-id', conv.conversation_id || '');
+        item.innerHTML = `
+            <div class="avatar-container">
+                ${avatarHtml}
+            </div>
+            <div class="contact-info">
+                <div class="contact-name-row">
+                    <div class="contact-name">${escapeHtml(conv.username)} ${pinnedIcon}</div>
+                    ${unreadBadge}
                 </div>
-                <div class="category-content" id="favorites-content">
-                    ${renderContactList(favorites)}
+                <div class="contact-message-row">
+                    <div class="contact-last-message">${escapeHtml(lastMessage)}</div>
+                    <div class="contact-time">${timeStr}</div>
                 </div>
             </div>
         `;
-    }
-    
-    // Archivés
-    if (archived.length > 0) {
-        hasCategories = true;
-        categoriesHtml += `
-            <div class="category-bar" data-category="archived">
-                <div class="category-header" data-toggle="archived">
-                    <span class="category-title"><i class="fas fa-archive"></i> Archivés</span>
-                    <span class="category-toggle"><i class="fas fa-chevron-down"></i></span>
-                </div>
-                <div class="category-content" id="archived-content">
-                    ${renderContactList(archived)}
-                </div>
-            </div>
-        `;
-    }
-    
-    // Liste principale (épinglés + normaux)
-    let mainListHtml = '';
-    if (pinned.length > 0) {
-        mainListHtml += `<div class="pinned-section">${renderContactList(pinned)}</div>`;
-    }
-    if (normal.length > 0) {
-        mainListHtml += renderContactList(normal);
-    }
-    
-    if (hasCategories) {
-        document.body.classList.add('has-categories');
-    } else {
-        document.body.classList.remove('has-categories');
-    }
-    
-    categoriesContainer.innerHTML = categoriesHtml;
-    conversationsList.innerHTML = mainListHtml;
-    
-    // Attacher événements pour les catégories
-    document.querySelectorAll('.category-header').forEach(header => {
-        header.addEventListener('click', () => {
-            const content = header.parentElement.querySelector('.category-content');
-            const icon = header.querySelector('.category-toggle i');
-            content.classList.toggle('expanded');
-            if (content.classList.contains('expanded')) {
-                icon.className = 'fas fa-chevron-up';
-            } else {
-                icon.className = 'fas fa-chevron-down';
-            }
+        
+        // Clic simple → ouvrir chat
+        item.addEventListener('click', () => {
+            window.location.href = `chat.html?contact=${conv.id}`;
         });
         
-        // Ouvrir par défaut
-        const content = header.parentElement.querySelector('.category-content');
-        content.classList.add('expanded');
-        const icon = header.querySelector('.category-toggle i');
-        icon.className = 'fas fa-chevron-up';
-    });
-    
-    // Attacher événements clic sur contacts
-    document.querySelectorAll('.contact-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            if (!isLongPress) {
-                const contactId = item.dataset.contactId;
-                const conversationId = item.dataset.conversationId;
-                window.location.href = `chat.html?contact=${contactId}&conv=${conversationId}`;
-            }
-            isLongPress = false;
-        });
-        
-        // Appui long
-        let pressTimer;
+        // Appui long → menu contextuel
         item.addEventListener('touchstart', (e) => {
-            pressTimer = setTimeout(() => {
-                isLongPress = true;
-                const contactId = item.dataset.contactId;
-                const username = item.dataset.username;
-                showContextMenu(e, contactId, username);
+            longPressTimer = setTimeout(() => {
+                currentSelectedContact = conv;
+                showContextMenu(e, conv);
             }, 500);
         });
         
         item.addEventListener('touchend', () => {
-            clearTimeout(pressTimer);
-            setTimeout(() => { isLongPress = false; }, 100);
+            clearTimeout(longPressTimer);
         });
         
         item.addEventListener('touchmove', () => {
-            clearTimeout(pressTimer);
+            clearTimeout(longPressTimer);
         });
         
-        // Pour souris (développement)
+        // Pour souris (test)
         item.addEventListener('mousedown', (e) => {
-            pressTimer = setTimeout(() => {
-                isLongPress = true;
-                const contactId = item.dataset.contactId;
-                const username = item.dataset.username;
-                showContextMenu(e, contactId, username);
+            longPressTimer = setTimeout(() => {
+                currentSelectedContact = conv;
+                showContextMenu(e, conv);
             }, 500);
         });
         
         item.addEventListener('mouseup', () => {
-            clearTimeout(pressTimer);
-            setTimeout(() => { isLongPress = false; }, 100);
+            clearTimeout(longPressTimer);
         });
         
-        item.addEventListener('mouseleave', () => {
-            clearTimeout(pressTimer);
+        conversationsList.appendChild(item);
+    });
+}
+
+// ========== MENU CONTEXTUEL ==========
+function showContextMenu(event, contact) {
+    contextMenu.style.display = 'flex';
+    contextMenu.style.left = `${event.clientX}px`;
+    contextMenu.style.top = `${event.clientY}px`;
+    
+    // Configurer les actions
+    document.getElementById('view-profile').onclick = () => {
+        window.location.href = `profil.html?user=${contact.id}`;
+        hideContextMenu();
+    };
+    
+    document.getElementById('add-favorite').onclick = () => {
+        toggleFavorite(contact);
+        hideContextMenu();
+    };
+    
+    document.getElementById('pin-chat').onclick = () => {
+        togglePin(contact);
+        hideContextMenu();
+    };
+    
+    document.getElementById('archive-chat').onclick = () => {
+        toggleArchive(contact);
+        hideContextMenu();
+    };
+    
+    document.getElementById('delete-chat').onclick = () => {
+        deleteConversation(contact);
+        hideContextMenu();
+    };
+    
+    document.getElementById('report-chat').onclick = () => {
+        window.location.href = `signal.html?user=${contact.id}`;
+        hideContextMenu();
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', hideContextMenu);
+    }, 100);
+}
+
+function hideContextMenu() {
+    contextMenu.style.display = 'none';
+    document.removeEventListener('click', hideContextMenu);
+}
+
+// ========== ACTIONS SUR CONVERSATIONS ==========
+async function toggleFavorite(contact) {
+    const newValue = !contact.is_favorite;
+    await supabaseClient
+        .from('user_conversation_prefs')
+        .upsert({
+            user_id: currentUser.id,
+            contact_id: contact.id,
+            is_favorite: newValue,
+            updated_at: new Date().toISOString()
+        });
+    
+    contact.is_favorite = newValue;
+    refreshDisplay();
+}
+
+async function togglePin(contact) {
+    const newValue = !contact.is_pinned;
+    await supabaseClient
+        .from('user_conversation_prefs')
+        .upsert({
+            user_id: currentUser.id,
+            contact_id: contact.id,
+            is_pinned: newValue,
+            updated_at: new Date().toISOString()
+        });
+    
+    contact.is_pinned = newValue;
+    refreshDisplay();
+}
+
+async function toggleArchive(contact) {
+    const newValue = !contact.is_archived;
+    await supabaseClient
+        .from('user_conversation_prefs')
+        .upsert({
+            user_id: currentUser.id,
+            contact_id: contact.id,
+            is_archived: newValue,
+            updated_at: new Date().toISOString()
+        });
+    
+    contact.is_archived = newValue;
+    refreshDisplay();
+}
+
+async function deleteConversation(contact) {
+    if (confirm(`Supprimer la conversation avec ${contact.username} ?`)) {
+        // Supprimer tous les messages
+        if (contact.conversation_id) {
+            await supabaseClient
+                .from('messages')
+                .delete()
+                .eq('conversation_id', contact.conversation_id);
+        }
+        
+        // Supprimer la conversation
+        if (contact.conversation_id) {
+            await supabaseClient
+                .from('conversations')
+                .delete()
+                .eq('id', contact.conversation_id);
+        }
+        
+        refreshDisplay();
+    }
+}
+
+// ========== RECHERCHE ==========
+function filterConversations(query) {
+    if (!query) {
+        renderConversations(conversations);
+        return;
+    }
+    
+    const filtered = conversations.filter(conv =>
+        conv.username.toLowerCase().includes(query.toLowerCase())
+    );
+    renderConversations(filtered);
+}
+
+// ========== AFFICHAGE AVEC CATÉGORIES ==========
+async function refreshDisplay() {
+    conversations = await loadConversations();
+    
+    // Séparer par catégories
+    const pinned = conversations.filter(c => c.is_pinned);
+    const favorites = conversations.filter(c => c.is_favorite && !c.is_pinned);
+    const archived = conversations.filter(c => c.is_archived);
+    const normal = conversations.filter(c => !c.is_pinned && !c.is_favorite && !c.is_archived);
+    
+    // Afficher les catégories
+    let categoriesHtml = '';
+    
+    if (pinned.length > 0) {
+        categoriesHtml += `
+            <div class="category-bar" data-category="pinned">
+                <div class="category-header">
+                    <span class="category-title">📌 Épinglés</span>
+                    <i class="fas fa-chevron-down category-toggle"></i>
+                </div>
+                <div class="category-content expanded">
+                    ${renderCategoryItems(pinned)}
+                </div>
+            </div>
+        `;
+    }
+    
+    if (favorites.length > 0) {
+        categoriesHtml += `
+            <div class="category-bar" data-category="favorites">
+                <div class="category-header">
+                    <span class="category-title">⭐ Favoris</span>
+                    <i class="fas fa-chevron-down category-toggle"></i>
+                </div>
+                <div class="category-content expanded">
+                    ${renderCategoryItems(favorites)}
+                </div>
+            </div>
+        `;
+    }
+    
+    if (archived.length > 0) {
+        categoriesHtml += `
+            <div class="category-bar" data-category="archived">
+                <div class="category-header">
+                    <span class="category-title">📦 Archivés</span>
+                    <i class="fas fa-chevron-down category-toggle"></i>
+                </div>
+                <div class="category-content expanded">
+                    ${renderCategoryItems(archived)}
+                </div>
+            </div>
+        `;
+    }
+    
+    categoriesContainer.innerHTML = categoriesHtml;
+    
+    // Afficher les conversations normales
+    renderConversations(normal);
+    
+    // Ajouter les événements toggle
+    document.querySelectorAll('.category-bar').forEach(bar => {
+        const header = bar.querySelector('.category-header');
+        const content = bar.querySelector('.category-content');
+        const toggle = bar.querySelector('.category-toggle');
+        
+        header.addEventListener('click', () => {
+            content.classList.toggle('expanded');
+            toggle.classList.toggle('fa-chevron-down');
+            toggle.classList.toggle('fa-chevron-up');
         });
     });
 }
 
-function renderContactList(contacts) {
-    return contacts.map(contact => {
-        const statusClass = contact.status === 'online' ? 'online' : (contact.status === 'away' ? 'away' : 'offline');
-        const initial = contact.username.charAt(0).toUpperCase();
-        const avatarHtml = contact.avatar_url 
-            ? `<img src="${contact.avatar_url}" class="avatar ${statusClass}" alt="${contact.username}">`
-            : `<div class="avatar ${statusClass}">${initial}</div>`;
-        
-        const lastMessage = contact.last_message 
-            ? (contact.last_message.sender_id === currentUserId ? 'Vous: ' : '') + contact.last_message.text
-            : 'Aucun message';
-        
-        const time = contact.last_message 
-            ? formatTime(contact.last_message.time)
-            : '';
-        
-        const unreadBadge = contact.unread_count > 0 
-            ? `<span class="unread-badge">${contact.unread_count > 99 ? '99+' : contact.unread_count}</span>`
-            : '';
+function renderCategoryItems(convs) {
+    return convs.map(conv => {
+        const initial = conv.username.charAt(0).toUpperCase();
+        const avatarHtml = conv.avatar_url 
+            ? `<img src="${conv.avatar_url}" class="avatar" alt="${conv.username}">`
+            : `<div class="avatar">${initial}</div>`;
         
         return `
-            <div class="contact-item" 
-                 data-contact-id="${contact.contactId}" 
-                 data-conversation-id="${contact.id}"
-                 data-username="${contact.username}">
+            <div class="contact-item category-item" data-contact-id="${conv.id}" data-conversation-id="${conv.conversation_id || ''}">
                 <div class="avatar-container">
                     ${avatarHtml}
                 </div>
                 <div class="contact-info">
-                    <div class="contact-name-row">
-                        <span class="contact-name">${escapeHtml(contact.username)}</span>
-                        ${unreadBadge}
-                    </div>
-                    <div class="contact-message-row">
-                        <span class="contact-last-message">${escapeHtml(lastMessage)}</span>
-                        <span class="contact-time">${time}</span>
-                    </div>
+                    <div class="contact-name">${escapeHtml(conv.username)}</div>
                 </div>
             </div>
         `;
     }).join('');
 }
 
-function formatTime(dateStr) {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now - date;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) {
-        return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    } else if (days === 1) {
-        return 'hier';
-    } else if (days < 7) {
-        return date.toLocaleDateString('fr-FR', { weekday: 'short' });
-    } else {
-        return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    }
+// Attacher événements aux items des catégories
+function attachCategoryEvents() {
+    document.querySelectorAll('.category-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const contactId = item.dataset.contactId;
+            window.location.href = `chat.html?contact=${contactId}`;
+        });
+    });
 }
 
+// ========== NOTIFICATION ==========
+function showNotification(message, type = 'info') {
+    let notification = document.getElementById('notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        notification.className = 'notification';
+        document.body.appendChild(notification);
+    }
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <span>${message}</span>
+        <button class="notif-close">×</button>
+    `;
+    notification.style.display = 'flex';
+    
+    const closeBtn = notification.querySelector('.notif-close');
+    closeBtn.onclick = () => {
+        notification.style.display = 'none';
+    };
+    
+    setTimeout(() => {
+        if (notification) notification.style.display = 'none';
+    }, 4000);
+}
+
+// ========== ESCAPE HTML ==========
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, function(m) {
@@ -363,194 +542,35 @@ function escapeHtml(str) {
     });
 }
 
-let currentContextContactId = null;
-let currentContextUsername = null;
-
-function showContextMenu(event, contactId, username) {
-    event.preventDefault();
-    currentContextContactId = contactId;
-    currentContextUsername = username;
+// ========== INITIALISATION ==========
+async function init() {
+    const user = await getCurrentUser();
+    if (!user) return;
     
-    const x = event.clientX || event.touches?.[0]?.clientX;
-    const y = event.clientY || event.touches?.[0]?.clientY;
+    await refreshDisplay();
+    attachCategoryEvents();
     
-    contextMenu.style.display = 'flex';
-    contextMenu.style.position = 'fixed';
-    contextMenu.style.top = `${y - 50}px`;
-    contextMenu.style.right = '16px';
-    
-    setTimeout(() => {
-        contextMenu.classList.add('show');
-    }, 10);
-}
-
-function hideContextMenu() {
-    contextMenu.classList.remove('show');
-    setTimeout(() => {
-        contextMenu.style.display = 'none';
-    }, 200);
-}
-
-async function updateConversationPreference(conversationId, field, value) {
-    const { data: existing } = await supabaseClient
-        .from('user_conversation_preferences')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('conversation_id', conversationId)
-        .single();
-    
-    if (existing) {
-        await supabaseClient
-            .from('user_conversation_preferences')
-            .update({ [field]: value, updated_at: new Date().toISOString() })
-            .eq('user_id', currentUserId)
-            .eq('conversation_id', conversationId);
-    } else {
-        await supabaseClient
-            .from('user_conversation_preferences')
-            .insert({
-                user_id: currentUserId,
-                conversation_id: conversationId,
-                [field]: value,
-                is_favorite: field === 'is_favorite' ? value : false,
-                is_pinned: field === 'is_pinned' ? value : false,
-                is_archived: field === 'is_archived' ? value : false
-            });
-    }
-    
-    await loadConversations();
-}
-
-// Événements menu contextuel
-viewProfileBtn.addEventListener('click', async () => {
-    hideContextMenu();
-    if (currentContextContactId) {
-        window.location.href = `profil.html?id=${currentContextContactId}`;
-    }
-});
-
-addFavoriteBtn.addEventListener('click', async () => {
-    hideContextMenu();
-    if (currentContextContactId) {
-        // Récupérer la conversation
-        const { data: conv } = await supabaseClient
-            .from('conversations')
-            .select('id')
-            .eq('participants.user_id', currentUserId)
-            .eq('participants.user_id', currentContextContactId)
-            .single();
-        
-        if (conv) {
-            await updateConversationPreference(conv.id, 'is_favorite', true);
-        }
-    }
-});
-
-pinChatBtn.addEventListener('click', async () => {
-    hideContextMenu();
-    if (currentContextContactId) {
-        const { data: conv } = await supabaseClient
-            .from('conversations')
-            .select('id')
-            .eq('participants.user_id', currentUserId)
-            .eq('participants.user_id', currentContextContactId)
-            .single();
-        
-        if (conv) {
-            await updateConversationPreference(conv.id, 'is_pinned', true);
-        }
-    }
-});
-
-archiveChatBtn.addEventListener('click', async () => {
-    hideContextMenu();
-    if (currentContextContactId) {
-        const { data: conv } = await supabaseClient
-            .from('conversations')
-            .select('id')
-            .eq('participants.user_id', currentUserId)
-            .eq('participants.user_id', currentContextContactId)
-            .single();
-        
-        if (conv) {
-            await updateConversationPreference(conv.id, 'is_archived', true);
-        }
-    }
-});
-
-deleteChatBtn.addEventListener('click', async () => {
-    hideContextMenu();
-    if (currentContextContactId && confirm('Supprimer cette conversation ?')) {
-        const { data: conv } = await supabaseClient
-            .from('conversations')
-            .select('id')
-            .eq('participants.user_id', currentUserId)
-            .eq('participants.user_id', currentContextContactId)
-            .single();
-        
-        if (conv) {
-            await supabaseClient
-                .from('conversations')
-                .delete()
-                .eq('id', conv.id);
-            
-            await loadConversations();
-        }
-    }
-});
-
-reportChatBtn.addEventListener('click', () => {
-    hideContextMenu();
-    if (currentContextContactId) {
-        window.location.href = `signal.html?user=${currentContextContactId}`;
-    }
-});
-
-// Clic en dehors pour fermer le menu
-document.addEventListener('click', (e) => {
-    if (contextMenu.style.display === 'flex' && !contextMenu.contains(e.target)) {
-        hideContextMenu();
-    }
-});
-
-// Recherche
-searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    document.querySelectorAll('.contact-item').forEach(item => {
-        const name = item.querySelector('.contact-name').textContent.toLowerCase();
-        item.style.display = name.includes(query) ? 'flex' : 'none';
+    // Recherche
+    searchInput.addEventListener('input', (e) => {
+        filterConversations(e.target.value);
     });
-});
-
-// Navigation
-function setupNavigation() {
-    const navBtns = document.querySelectorAll('.nav-btn');
-    navBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const page = btn.dataset.page;
-            if (page === 'chat') return;
-            if (page === 'blog') window.location.href = 'blog.html';
-            if (page === 'recherche') window.location.href = 'recherche.html';
-            if (page === 'parametres') window.location.href = 'para.html';
-        });
-    });
-}
-
-function setupEventListeners() {
-    // Scroll hide nav (identique à comple.html)
-    const scrollContainer = document.querySelector('.conversations-list');
-    let lastScrollTop = 0;
     
-    scrollContainer.addEventListener('scroll', () => {
-        const scrollTop = scrollContainer.scrollTop;
-        if (scrollTop > lastScrollTop && scrollTop > 50) {
-            bottomNav.classList.add('hide');
-        } else {
-            bottomNav.classList.remove('hide');
-        }
-        lastScrollTop = scrollTop;
-    });
+    // Abonnement temps réel pour nouveaux messages
+    supabaseClient
+        .channel('messages-updates')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+        }, (payload) => {
+            const newMsg = payload.new;
+            // Vérifier si le message concerne l'utilisateur courant
+            if (newMsg.receiver_id === currentUser.id || newMsg.sender_id === currentUser.id) {
+                refreshDisplay();
+                attachCategoryEvents();
+            }
+        })
+        .subscribe();
 }
 
-// Démarrer
 init();
